@@ -1,0 +1,91 @@
+#Contributor : Satish : github @ssjsk
+#This will help in building docker image for Postgres10, Python 3.6 for Ubuntu 16:04
+#Should work for Ubuntu 18 too, but I've not tried
+#You can ignore Python bit if you just need Postgresql
+
+FROM ubuntu:16.04
+
+# ensure local python is preferred over distribution python
+ENV PATH /usr/local/bin:$PATH
+
+# http://bugs.python.org/issue19846
+# > At the moment, setting "LANG=C" on a Linux system *fundamentally breaks Python 3*, and that's not OK.
+ENV LANG C.UTF-8
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get install -y software-properties-common vim
+RUN add-apt-repository ppa:jonathonf/python-3.6
+RUN apt-get update
+RUN apt-get install dialog apt-utils -y
+
+RUN apt-get install -y build-essential python3.6 python3.6-dev python3-pip python3.6-venv
+RUN apt-get install -y git
+
+# update pip
+RUN python3.6 -m pip install pip --upgrade
+RUN python3.6 -m pip install wheel
+
+
+# Updating Ubuntu packages
+RUN apt-get update && yes|apt-get upgrade
+RUN apt-get install -y emacs
+
+# Adding wget and bzip2
+RUN apt-get install -y wget bzip2
+
+# Add sudo
+RUN apt-get -y install sudo
+
+# Add user ubuntu with no password, add to sudo group
+RUN adduser --disabled-password --gecos '' my_user
+RUN adduser my_user sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER my_user
+WORKDIR /home/my_user/
+RUN chmod a+rwx /home/my_user/
+RUN echo `pwd`
+
+
+ENV PATH /home/my_user/.local/bin:$PATH
+# this part is fishy but it's what it is, we need it for our specific case 
+ENV GRANT_SUDO=yes
+USER root
+WORKDIR /home/my_user/work/
+
+
+
+ENV GRANT_SUDO=yes 
+USER root
+RUN apt-get update -qq
+RUN apt-get -y --no-install-recommends install \
+  apt-transport-https \
+  libssl-dev \
+  libsasl2-dev \
+  openssl \
+  curl \
+  unixodbc \
+  unixodbc-dev \
+  odbcinst \
+  gnupg
+
+# Install PostgreSQL v10
+RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+RUN apt-get update
+RUN apt-get install -y libpq-dev postgresql-10
+
+# Run the rest of the commands as the `postgres` user
+USER postgres
+
+# Create a PostgreSQL role named `docker` with `docker` as the password
+# and then create a database `docker` owned by the ``docker` role.
+RUN /etc/init.d/postgresql start &&\
+    psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker_password';"
+
+EXPOSE 5432
+
+#Start the postgresql service so that your docker images have it running at lauch.
+CMD ["/usr/lib/postgresql/10/bin/postgres", "-D", "/var/lib/postgresql/10/main", "-c", "config_file=/etc/postgresql/10/main/postgresql.conf"]
+WORKDIR /home/my_user/work/
+
+
