@@ -74,18 +74,26 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-k
 RUN apt-get update
 RUN apt-get install -y libpq-dev postgresql-10
 
+# Adjust PostgreSQL configuration so that remote connections to the
+# database are possible.
+RUN echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/10/main/pg_hba.conf
+
+# And add ``listen_addresses`` to ``/etc/postgresql/10/main/postgresql.conf``
+RUN echo "listen_addresses='*'" >> /etc/postgresql/10/main/postgresql.conf
+
 # Run the rest of the commands as the `postgres` user
 USER postgres
 
 # Create a PostgreSQL role named `docker` with `docker` as the password
 # and then create a database `docker` owned by the ``docker` role.
 RUN /etc/init.d/postgresql start &&\
-    psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker_password';"
+    psql --command "CREATE USER mydbuser WITH SUPERUSER PASSWORD 'mydbpass';"
 
 EXPOSE 5432
 
-#Start the postgresql service so that your docker images have it running at lauch.
+
 CMD ["/usr/lib/postgresql/10/bin/postgres", "-D", "/var/lib/postgresql/10/main", "-c", "config_file=/etc/postgresql/10/main/postgresql.conf"]
 WORKDIR /home/my_user/work/
+
 
 
