@@ -1,0 +1,86 @@
+# Contributo - Satish : git @ssjsk
+# This dockerfile helps in creating minimal image for Python3.6 on Ubuntu 16.04, 
+# additionally I've included odcb packages for MS SQL Server 
+# Most likely it'll work for higher versions of python as well as Ubuntu 18
+
+FROM ubuntu:16.04
+
+# ensure local python is preferred over distribution python
+ENV PATH /usr/local/bin:$PATH
+
+
+ENV LANG C.UTF-8
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get install -y software-properties-common vim
+RUN add-apt-repository ppa:jonathonf/python-3.6
+RUN apt-get update
+RUN apt-get install dialog apt-utils -y
+
+RUN apt-get install -y build-essential python3.6 python3.6-dev python3-pip python3.6-venv
+RUN apt-get install -y git
+
+# update pip
+RUN python3.6 -m pip install pip --upgrade
+RUN python3.6 -m pip install wheel
+
+
+# Updating Ubuntu packages
+RUN apt-get update && yes|apt-get upgrade
+RUN apt-get install -y emacs
+
+# Adding wget and bzip2
+RUN apt-get install -y wget bzip2
+
+# Add sudo
+RUN apt-get -y install sudo
+
+# Add user ubuntu with no password, add to sudo group
+RUN adduser --disabled-password --gecos '' my_user
+RUN adduser my_user sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER my_user
+WORKDIR /home/my_user/
+RUN chmod a+rwx /home/my_user/
+RUN echo `pwd`
+
+ENV PATH /home/my_user/.local/bin:$PATH
+ENV GRANT_SUDO=yes
+USER root
+WORKDIR /home/my_user/work/
+
+#if you've more python packages to install, include their names in a text file and put in same folder as this Dockerfile
+# COPY pypackages.txt ./
+
+
+ENV GRANT_SUDO=yes 
+USER root
+RUN apt-get update -qq
+RUN apt-get -y --no-install-recommends install \
+  apt-transport-https \
+  libssl-dev \
+  libsasl2-dev \
+  openssl \
+  curl \
+  unixodbc \
+  unixodbc-dev \
+  odbcinst \
+  gnupg
+
+#sql server drivers
+#install MS SQL Server 17 odbc driver
+ENV GRANT_SUDO=yes
+USER root
+RUN  curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+RUN  curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list > /etc/apt/sources.list.d/mssql-release.list
+RUN  apt-get update
+RUN  ACCEPT_EULA=Y apt-get install msodbcsql17
+RUN  ACCEPT_EULA=Y apt-get install mssql-tools
+RUN  apt-get update
+
+#uncomment following line if you want additional python packages
+#RUN pip install -r pypackages.txt 
+
+RUN apt-get install -y zip unzip
+WORKDIR /home/my_user/work/
+
